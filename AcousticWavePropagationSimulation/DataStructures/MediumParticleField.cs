@@ -24,7 +24,6 @@ namespace AcousticWavePropagationSimulation.DataStructures
 
         public void SetParticleField()
         {
-            _particleField = new MediumParticle[];
         }
     }
 }
