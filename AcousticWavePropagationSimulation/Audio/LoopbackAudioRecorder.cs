@@ -6,19 +6,20 @@ namespace AcousticWavePropagationSimulation.Audio
     public class LoopbackAudioRecorder
     {
         private WaveBuffer _buffer;
+        private WasapiLoopbackCapture _capture;
 
         public LoopbackAudioRecorder()
         {
-            Capture = new WasapiLoopbackCapture();
+            _capture = new WasapiLoopbackCapture();
 
-            Globals.SampleRate = Capture.WaveFormat.SampleRate;
+            Globals.SampleRate = _capture.WaveFormat.SampleRate;
 
-            Capture.DataAvailable += DataAvailable;
+            _capture.DataAvailable += DataAvailable;
 
-            Capture.StartRecording();
+            _capture.StartRecording();
         }
 
-        public WasapiLoopbackCapture Capture { get; }
+        
 
         public void DataAvailable(object sender, WaveInEventArgs e)
         {
@@ -45,7 +46,7 @@ namespace AcousticWavePropagationSimulation.Audio
 
         public void Dispose()
         {
-            Capture.Dispose();
+            _capture.Dispose();
         }
     }
 }

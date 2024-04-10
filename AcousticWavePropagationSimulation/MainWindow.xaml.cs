@@ -1,6 +1,6 @@
 ﻿using AcousticWavePropagationSimulation.ViewModels;
+using System;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace AcousticWavePropagationSimulation
 {
@@ -14,7 +14,14 @@ namespace AcousticWavePropagationSimulation
         {
             InitializeComponent();
 
-            _viewModel = new VisualizationViewModel(new Canvas());
+            InitializeViewModel();
+        }
+
+        private void InitializeViewModel()
+        {
+            _viewModel = new VisualizationViewModel((int)Width, (int)Height);
+
+            DataContext = _viewModel;
         }
     }
 }

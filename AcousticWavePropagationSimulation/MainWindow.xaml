@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:AcousticWavePropagationSimulation"
         mc:Ignorable="d"
-        Title="MainWindow" Height="800" Width="800">
+        Title="MainWindow" Height="400" Width="400">
     <Grid>
-        <Canvas x:Name="Frame"/>
+        <ContentControl x:Name="Visualizer" Content="{Binding Path=Image}" Width="Auto" Height="Auto"/>
     </Grid>
 </Window>
