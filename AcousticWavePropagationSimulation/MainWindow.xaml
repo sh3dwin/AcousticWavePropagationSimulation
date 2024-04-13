@@ -5,8 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:AcousticWavePropagationSimulation"
         mc:Ignorable="d"
-        Title="MainWindow" Height="400" Width="400">
+        Title="MainWindow" MinHeight="400" MinWidth="400" Height="1200" Width="1200">
     <Grid>
-        <ContentControl x:Name="Visualizer" Content="{Binding Path=Image}" Width="Auto" Height="Auto"/>
+        <Image x:Name="Visualizer" Source="{Binding Image}"/>
+        <Slider x:Name="PropagationSpeed" Value="{Binding PropagationSpeed}"
+                Minimum="10"
+                Maximum="5000"
+                HorizontalAlignment="Center"
+                Margin="50, 0, 50, 100"
+                VerticalAlignment="Bottom"
+                MinWidth="500"
+                />
     </Grid>
 </Window>
