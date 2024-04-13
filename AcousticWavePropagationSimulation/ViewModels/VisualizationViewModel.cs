@@ -11,6 +11,9 @@ using System.Threading.Tasks;
 using System.Drawing;
 using System.IO;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using System.Windows.Input;
+using AcousticWavePropagationSimulation.WPF.Commands;
 
 namespace AcousticWavePropagationSimulation.ViewModels
 {
@@ -26,6 +29,8 @@ namespace AcousticWavePropagationSimulation.ViewModels
         private Dictionary<int, DirectBitmap> _waveImages;
         private Dictionary<int, MediumParticleField> _particleFields;
 
+        private DispatcherTimer _dispatcherTimer;
+
         private int _numberOfPartitions;
         private float _partitionWidth;
         private float _partitionHeight;
@@ -35,7 +40,6 @@ namespace AcousticWavePropagationSimulation.ViewModels
             _width = width;
             _height = height;
             _recorder = new LoopbackAudioRecorder();
-
 
             _waveBuffer = new CircularBuffer<double>(Constants.BufferSize);
 
@@ -51,6 +55,9 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
                 _waveImages.Add(i, waveImage);
             }
+
+            _dispatcherTimer = new DispatcherTimer();
+            _dispatcherTimer.Interval = TimeSpan.FromMilliseconds(100);
 
             _image = new BitmapImage();
 
@@ -74,9 +81,9 @@ namespace AcousticWavePropagationSimulation.ViewModels
                 throw new Exception("Error initializing particle fields");
             }
 
-            _recorder.DataAvailableEvent += Update;
+            //_dispatcherTimer.Tick += UpdateVisualization;
+            _recorder.DataAvailableEvent += UpdateVisualization;
         }
-
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -101,14 +108,22 @@ namespace AcousticWavePropagationSimulation.ViewModels
             }
         }
 
+        public void RaisePropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        
+
         private void RecalculateDelay()
         {
-            foreach(var particleField in _particleFields.Values) { 
+            foreach (var particleField in _particleFields.Values)
+            {
                 particleField.CalculateDelay(PropagationSpeed);
             }
         }
 
-        private void Update(object sender, EventArgs e)
+        private void UpdateVisualization(object sender, EventArgs e)
         {
             UpdateBuffer(sender, e);
             UpdateMediumState(sender, e);
@@ -123,11 +138,6 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
             Buffer.BlockCopy(newData, 0, floatData, 0, newData.Length);
 
-            foreach (float f in floatData)
-            {
-                Console.WriteLine(f);
-            }
-
             for (var i = 0; i < floatData.Length; i++)
             {
                 _waveBuffer.Add(floatData[i]);
@@ -137,25 +147,9 @@ namespace AcousticWavePropagationSimulation.ViewModels
         private void UpdateImage(object sender, EventArgs e)
         {
             var bitmap = AppendBitmapPartitions();
-            
+
             Image = BitmapToImageSource(bitmap);
             Image.Freeze();
-        }
-
-        BitmapImage BitmapToImageSource(Bitmap bitmap)
-        {
-            using (MemoryStream memory = new MemoryStream())
-            {
-                bitmap.Save(memory, System.Drawing.Imaging.ImageFormat.Bmp);
-                memory.Position = 0;
-                BitmapImage bitmapImage = new BitmapImage();
-                bitmapImage.BeginInit();
-                bitmapImage.StreamSource = memory;
-                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                bitmapImage.EndInit();
-
-                return bitmapImage;
-            }
         }
 
         private void UpdateMediumState(object sender, EventArgs e)
@@ -188,16 +182,57 @@ namespace AcousticWavePropagationSimulation.ViewModels
             return result;
         }
 
-        public void RaisePropertyChanged([CallerMemberName] string propertyName = null)
+        BitmapImage BitmapToImageSource(Bitmap bitmap)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            using (MemoryStream memory = new MemoryStream())
+            {
+                bitmap.Save(memory, System.Drawing.Imaging.ImageFormat.Bmp);
+                memory.Position = 0;
+                BitmapImage bitmapImage = new BitmapImage();
+                bitmapImage.BeginInit();
+                bitmapImage.StreamSource = memory;
+                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                bitmapImage.EndInit();
+
+                return bitmapImage;
+            }
+        }
+
+        private ICommand _toggleVisualization;
+
+        public ICommand ToggleVisualizationCommand
+        {
+            get
+            {
+                if (_toggleVisualization == null)
+                {
+                    _toggleVisualization = new RelayCommand(
+                        _ => ToggleVisualization(),
+                        _ => CanToggle()
+                    );
+                }
+                return _toggleVisualization;
+            }
+        }
+
+        private bool CanToggle()
+        {
+            return _dispatcherTimer != null;
+        }
+
+        private void ToggleVisualization()
+        {
+            if (_dispatcherTimer.IsEnabled)
+                _dispatcherTimer.Stop();
+            else
+                _dispatcherTimer.Start();
         }
 
         public void Dispose()
         {
             _recorder.Dispose();
 
-            foreach(var waveImage in _waveImages.Values)
+            foreach (var waveImage in _waveImages.Values)
                 waveImage.Dispose();
 
         }

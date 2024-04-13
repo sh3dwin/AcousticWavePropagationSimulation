@@ -16,5 +16,9 @@
                 VerticalAlignment="Bottom"
                 MinWidth="500"
                 />
+        
+        <Button Margin="0, 50, 0, 0" VerticalAlignment="Top" Width="200" Height="50" Command="{Binding ToggleVisualizationCommand}">Toggle Visualization</Button>
+
+
     </Grid>
 </Window>

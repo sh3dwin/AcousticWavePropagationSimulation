@@ -78,7 +78,12 @@ namespace AcousticWavePropagationSimulation.DataStructures
                         column.Add(0);
                         continue;
                     }
-                    var amplitude = waveData[count - 1 - delay] * loss;
+                    var index = Math.Max(0, count - 1 - delay);
+                    var amplitude = waveData[index] * loss;
+
+                    if (amplitude > 1 || amplitude < -1)
+                        throw new Exception("Incorrect amplitude");
+
                     column.Add(amplitude);
                 }
                 result.Add(column);

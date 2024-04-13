@@ -87,13 +87,9 @@ namespace AcousticWavePropagationSimulation.Visualizer
 
             for (int row = 0; row < renderBuffer.Width; row++)
             {
-                var particleRow = particleAmplitudes[row];
                 for (int column = 0; column < renderBuffer.Height; column++)
                 {
                     var amplitude = particleAmplitudes[row][column];
-                    var hue = (int)((amplitude / 2.0 + 0.5) * 360);
-
-                    ColorUtils.HSVToRGB((int)((hue + hueShift) % 300), 100, 100, out var r, out var g, out var b);
 
                     var saturation = (int)(128 + 128 * amplitude);
 
