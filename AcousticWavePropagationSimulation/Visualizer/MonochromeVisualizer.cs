@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Drawing;
 using System.Linq;
+using System.Numerics;
 using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,11 +18,11 @@ namespace AcousticWavePropagationSimulation.Visualizer
 {
     public static class MonochromeVisualizer
     {
-        public static void Draw(List<List<double>> particleAmplitudes, ref WriteableBitmap renderBuffer)
+        public static void Draw(IDictionary<Vector2, double> particleAmplitudes, ref WriteableBitmap renderBuffer)
         {
             if (particleAmplitudes.Count == 0)
                 throw new Exception("No information provided!");
-            if (renderBuffer.Width < particleAmplitudes.Count || renderBuffer.Height < particleAmplitudes[0].Count)
+            if (renderBuffer.Width * renderBuffer.Height < particleAmplitudes.Count)
             {
                 throw new Exception("The information provided is larger than the canvas size");
             }
@@ -33,10 +34,9 @@ namespace AcousticWavePropagationSimulation.Visualizer
 
                 var hueShift = Math.Abs((int)(Math.Sin(DateTime.Now.Millisecond / 1000.0) * 360)) * 0;
 
-                for (int row = 0; row < renderBuffer.Width; row++)
+                for (int row = 0; row < renderBuffer.Height; row++)
                 {
-                    var particleRow = particleAmplitudes[row];
-                    for (int column = 0; column < renderBuffer.Height; column++)
+                    for (int column = 0; column < renderBuffer.Width; column++)
                     {
                         unsafe
                         {
@@ -47,7 +47,7 @@ namespace AcousticWavePropagationSimulation.Visualizer
                             pBackBuffer += row * renderBuffer.BackBufferStride;
                             pBackBuffer += column * 4;
 
-                            var amplitude = particleAmplitudes[row][column];
+                            var amplitude = particleAmplitudes[new Vector2(column, row)];
                             var hue = (int)((amplitude / 2.0 + 0.5) * 360);
 
                             ColorUtils.HSVToRGB((int)((hue + hueShift) % 360), 100, 100, out var r, out var g, out var b);
@@ -76,22 +76,24 @@ namespace AcousticWavePropagationSimulation.Visualizer
             }
         }
 
-        public static void Draw(List<List<double>> particleAmplitudes, ref DirectBitmap renderBuffer, int hueShift)
+        public static void Draw(IDictionary<Vector2, double> particleAmplitudes, ref DirectBitmap renderBuffer, int hueShift)
         {
             if (particleAmplitudes.Count == 0)
                 throw new Exception("No information provided!");
-            if (renderBuffer.Width < particleAmplitudes.Count || renderBuffer.Height < particleAmplitudes[0].Count)
+            if (renderBuffer.Width * renderBuffer.Height < particleAmplitudes.Count)
             {
                 throw new Exception("The information provided is larger than the canvas size");
             }
 
-            for (int row = 0; row < renderBuffer.Width; row++)
+            for (int row = 0; row < renderBuffer.Height; row++)
             {
-                for (int column = 0; column < renderBuffer.Height; column++)
+                for (int column = 0; column < renderBuffer.Width; column++)
                 {
-                    var amplitude = particleAmplitudes[row][column];
+                    var amplitude = particleAmplitudes[new Vector2(column, row)];
 
                     var saturation = (int)(128 + 128 * amplitude);
+
+                    ColorUtils.HSVToRGB(hueShift, saturation, 1, out var r, out var g, out var b);
 
                     var color = System.Drawing.Color.FromArgb(saturation, saturation, saturation);
 

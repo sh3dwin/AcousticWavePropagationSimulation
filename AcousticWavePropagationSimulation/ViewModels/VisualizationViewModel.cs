@@ -14,6 +14,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Windows.Input;
 using AcousticWavePropagationSimulation.WPF.Commands;
+using System.Numerics;
 
 namespace AcousticWavePropagationSimulation.ViewModels
 {
@@ -22,20 +23,22 @@ namespace AcousticWavePropagationSimulation.ViewModels
         private int _width;
         private int _height;
 
+        private double _widthMeters;
+        private double _heightMeters;
 
         private BitmapImage _image;
         private LoopbackAudioRecorder _recorder;
         private CircularBuffer<double> _waveBuffer;
-        private Dictionary<int, DirectBitmap> _waveImages;
-        private Dictionary<int, MediumParticleField> _particleFields;
+        DirectBitmap _waveImage;
+        MediumParticleField _particleField;
+
+        private IEnumerable<SoundSource> _soundSources;
 
         private DispatcherTimer _dispatcherTimer;
-
-        private int _numberOfPartitions;
-        private float _partitionWidth;
-        private float _partitionHeight;
-        public VisualizationViewModel(int width, int height)
+        public VisualizationViewModel(double widthMeters, double heightMeters, int width, int height)
         {
+            _widthMeters = widthMeters;
+            _heightMeters = heightMeters;
 
             _width = width;
             _height = height;
@@ -43,40 +46,28 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
             _waveBuffer = new CircularBuffer<double>(Constants.BufferSize);
 
-            _numberOfPartitions = (int)Math.Pow(Constants.ParallelizationParameter, 2);
-            _partitionWidth = width / Constants.ParallelizationParameter;
-            _partitionHeight = height / Constants.ParallelizationParameter;
-
-            _waveImages = new Dictionary<int, DirectBitmap>(_numberOfPartitions);
-
-            for (var i = 0; i < _numberOfPartitions; i++)
+            _soundSources = new List<SoundSource>()
             {
-                var waveImage = new DirectBitmap((int)_partitionWidth, (int)_partitionHeight);
+                new SoundSource(new Vector2(width / 2, height / 2)),
+                new SoundSource(new Vector2(width / 4, height / 4))
+            };
 
-                _waveImages.Add(i, waveImage);
-            }
+            _waveImage = new DirectBitmap(width, height);
 
             _dispatcherTimer = new DispatcherTimer();
             _dispatcherTimer.Interval = TimeSpan.FromMilliseconds(100);
 
             _image = new BitmapImage();
 
-            _particleFields = new Dictionary<int, MediumParticleField>(_numberOfPartitions);
-            for (var i = 0; i < _numberOfPartitions; i++)
+            var particleField = new MediumParticleField(_widthMeters, _heightMeters, width, height);
+            particleField.CreateParticleField();
+
+            if (particleField.IsInitialized)
             {
-                var startX = width / Constants.ParallelizationParameter * (i % Constants.ParallelizationParameter);
-                var startY = height / Constants.ParallelizationParameter * (i / Constants.ParallelizationParameter);
-
-                var particleField = new MediumParticleField(_partitionWidth, _partitionHeight, width / 2, height / 2);
-                particleField.CreateParticleField(startX, startY, PropagationSpeed);
-
-                if (particleField.IsInitialized)
-                {
-                    _particleFields.Add(i, particleField);
-                }
+                _particleField = particleField;
             }
 
-            if (_particleFields.Values.Any(x => !x.IsInitialized))
+            if (!_particleField.IsInitialized)
             {
                 throw new Exception("Error initializing particle fields");
             }
@@ -113,14 +104,11 @@ namespace AcousticWavePropagationSimulation.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        
+
 
         private void RecalculateDelay()
         {
-            foreach (var particleField in _particleFields.Values)
-            {
-                particleField.CalculateDelay(PropagationSpeed);
-            }
+            _particleField.GetMediumState(_soundSources);
         }
 
         private void UpdateVisualization(object sender, EventArgs e)
@@ -142,6 +130,9 @@ namespace AcousticWavePropagationSimulation.ViewModels
             {
                 _waveBuffer.Add(floatData[i]);
             }
+
+            foreach (var soundSource in _soundSources)
+                soundSource.UpdateBuffer(ref _waveBuffer);
         }
 
         private void UpdateImage(object sender, EventArgs e)
@@ -156,14 +147,10 @@ namespace AcousticWavePropagationSimulation.ViewModels
         {
             var hueShift = Math.Abs((int)(Math.Sin(DateTime.Now.Millisecond / 10000.0) * 360));
 
-            Parallel.For(0, _numberOfPartitions, partitionIndex =>
-            {
-                var particleField = _particleFields[partitionIndex];
-                var particleAmplitudes = particleField.GetMediumState(ref _waveBuffer);
-                var imagePartition = _waveImages[partitionIndex];
+            var particleAmplitudes = _particleField.GetMediumState(_soundSources);
 
-                MonochromeVisualizer.Draw(particleAmplitudes, ref imagePartition, 0);
-            });
+            MonochromeVisualizer.Draw(particleAmplitudes, ref _waveImage, 0);
+
         }
 
         private Bitmap AppendBitmapPartitions()
@@ -172,12 +159,7 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
             using (Graphics g = Graphics.FromImage(result))
             {
-                for (var i = 0; i < _numberOfPartitions; i++)
-                {
-                    var offsetY = _width / Constants.ParallelizationParameter * (i % Constants.ParallelizationParameter);
-                    var offsetX = _height / Constants.ParallelizationParameter * (i / Constants.ParallelizationParameter);
-                    g.DrawImage(_waveImages[i].Bitmap, offsetX, offsetY);
-                }
+                    g.DrawImage(_waveImage.Bitmap, 0, 0);
             }
             return result;
         }
@@ -232,8 +214,7 @@ namespace AcousticWavePropagationSimulation.ViewModels
         {
             _recorder.Dispose();
 
-            foreach (var waveImage in _waveImages.Values)
-                waveImage.Dispose();
+            _waveImage.Dispose();
 
         }
     }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.Utilities;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -10,26 +11,26 @@ namespace AcousticWavePropagationSimulation.DataStructures
 {
     public class MediumParticleField
     {
-        private float _height;
-        private float _width;
+        private float _dimY;
+        private float _dimX;
 
         private float _centerX;
         private float _centerY;
+
+        private double _width;
+        private double _height;
+
         private Dictionary<(int, int), MediumParticle> mediumParticles;
 
-        public MediumParticleField(float width, float height, float centerX, float centerY) {
+        public MediumParticleField(double width, double height, float numParticlesAlongXAxis, float numParticlesAlongYAxis)
+        {
             _width = width;
             _height = height;
-            _centerX = centerX;
-            _centerY = centerY;
+
+            _dimX = numParticlesAlongXAxis;
+            _dimY = numParticlesAlongYAxis;
 
             IsInitialized = false;
-        }
-
-        public void CalculateDelay(float propagationSpeed)
-        {
-            foreach (var particle in mediumParticles.Values)
-                particle.RecalculateDelay(propagationSpeed);
         }
 
         /// <summary>
@@ -37,18 +38,24 @@ namespace AcousticWavePropagationSimulation.DataStructures
         /// </summary>
         /// <param name="offsetX"></param>
         /// <param name="offsetY"></param>
-        public void CreateParticleField(int offsetX, int offsetY, float propagationSpeed)
+        public void CreateParticleField()
         {
             mediumParticles = new Dictionary<(int, int), MediumParticle>();
-            IsInitialized = true;
 
-            for (var i = 0; i < _width; i++)
+            var stepX = _width / _dimX;
+            var stepY = _height / _dimY;
+
+            for (var i = 0; i < _dimX; i++)
             {
-                for (var j = 0; j < _height; j++)
+                for (var j = 0; j < _dimY; j++)
                 {
-                    mediumParticles.Add((i, j), new MediumParticle((i + offsetX) - _centerX, (j + offsetY) - _centerY, propagationSpeed));
+
+                    var particle = new MediumParticle(new Vector2((float)(i * stepX), (float)(j * stepY)));
+                    mediumParticles.Add((i, j), particle);
                 }
             }
+
+            IsInitialized = true;
         }
 
         public bool IsInitialized { get; private set; }
@@ -59,37 +66,63 @@ namespace AcousticWavePropagationSimulation.DataStructures
         /// </summary>
         /// <param name="waveData"></param>
         /// <returns></returns>
-        public List<List<double>> GetMediumState(ref CircularBuffer<double> waveData)
+        public IDictionary<Vector2, double> GetMediumState(IEnumerable<SoundSource> soundSources)
         {
-            var result = new List<List<double>>();
+            var particleAmplitudes = new Dictionary<Vector2, double>(mediumParticles.Values.Count);
 
-            var count = waveData.Count;
-
-            for (var i = 0; i < _width; i++)
+            foreach(var particle in mediumParticles.Values)
             {
-                var column = new List<double>();
-                for (var j = 0; j < _height; j++)
-                {
-                    var particle = mediumParticles[(i, j)];
-                    var delay = particle.GetDelay();
-                    var loss = particle.GetLoss();
-                    if (delay >= count)
-                    {
-                        column.Add(0);
-                        continue;
-                    }
-                    var index = Math.Max(0, count - 1 - delay);
-                    var amplitude = waveData[index] * loss;
+                var amplitude = particle.CalculateAmplitude(soundSources);
 
-                    if (amplitude > 1 || amplitude < -1)
-                        throw new Exception("Incorrect amplitude");
+                if (amplitude > 1 || amplitude < -1)
+                    throw new Exception("Incorrect amplitude");
 
-                    column.Add(amplitude);
-                }
-                result.Add(column);
+                particleAmplitudes[particle.Position] = amplitude;
             }
 
-            return result;
+            return particleAmplitudes;
+        }
+
+        /// <summary>
+        /// Returns width * height values each corresponding to the amplitude of the wave at that location.
+        /// </summary>
+        /// <param name="waveData"></param>
+        /// <returns></returns>
+        public IDictionary<Vector2, double> GetMediumStateParallel(IEnumerable<SoundSource> soundSources, int parallelism)
+        {
+            var particleAmplitudes = new Dictionary<Vector2, double>(mediumParticles.Values.Count);
+
+            var xStep = _width / parallelism;
+            var yStep = _height / parallelism;
+
+            var indexes = new List<(int, int)>();
+
+            for (int i = 0; i < parallelism; i++)
+            {
+                for(int j = 0; j < parallelism; j++)
+                {
+                    indexes.Add((i, j));
+                }
+            }
+
+            Parallel.ForEach(indexes, new ParallelOptions { MaxDegreeOfParallelism = parallelism * parallelism}, step =>
+            {
+                for( var column = step.Item1 * yStep; column < (step.Item1 + 1) * yStep;  column++)
+                {
+                    for (var row = step.Item1 * yStep; row < (step.Item2 + 1) * yStep; row++)
+                    {
+                        var particle = mediumParticles[((int)column, (int)row)];
+                        var amplitude = particle.CalculateAmplitude(soundSources);
+
+                        if (amplitude > 1 || amplitude < -1)
+                            throw new Exception("Incorrect amplitude");
+
+                        particleAmplitudes[particle.Position] = amplitude;
+                    }
+                }
+            });
+
+            return particleAmplitudes;
         }
     }
 }

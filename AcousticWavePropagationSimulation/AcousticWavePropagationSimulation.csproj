@@ -209,6 +209,7 @@
     <Compile Include="DataStructures\DirectBitmap.cs" />
     <Compile Include="DataStructures\MediumParticle.cs" />
     <Compile Include="DataStructures\MediumParticleField.cs" />
+    <Compile Include="DataStructures\SoundSource.cs" />
     <Compile Include="Globals.cs" />
     <Compile Include="PropagationMediums\AirMedium.cs" />
     <Compile Include="PropagationMediums\PropagationMedium.cs" />

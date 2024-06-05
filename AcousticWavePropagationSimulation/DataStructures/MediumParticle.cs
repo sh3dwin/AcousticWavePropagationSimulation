@@ -1,41 +1,55 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Numerics;
 
 namespace AcousticWavePropagationSimulation.DataStructures
 {
     public class MediumParticle
     {
-        private DelayLine _delayLine;
+        public Vector2 Position { get; private set; }
 
-        private double _distance;
-        private double _loss;
-
-        public MediumParticle(double xDistance, double yDistance, double propagationSpeed)
+        public MediumParticle(Vector2 position)
         {
-
-            _distance = Math.Sqrt(xDistance * xDistance + yDistance * yDistance);
-            var samplePeriod = 1.0 / Globals.SampleRate;
-            _delayLine = new DelayLine(_distance, propagationSpeed, samplePeriod);
-            _loss = 1.0 / (_delayLine.Delay * 0.001 + 1);
+            Position = position;
         }
 
-        public void RecalculateDelay(double propagationSpeed)
+        public double CalculateAmplitude(IEnumerable<SoundSource> soundSources)
         {
-            var samplePeriod = 1.0 / Globals.SampleRate;
-            _delayLine = new DelayLine(_distance, propagationSpeed, samplePeriod);
-        }
+            var amplitude = 0.0;
 
-        public int GetDelay()
-        {
-            return _delayLine.Delay;
-        }
-
-        public double GetLoss()
-        {
-            if (_loss < 0 || _loss > 1)
+            foreach(var soundSource in soundSources)
             {
-                throw new Exception("Incorrect loss");
+                var sourcePosition = soundSource.Position;
+                
+                var sampleDelay = CalculateSampleDelay(sourcePosition);
+                var energyLoss = CalculateEnergyLoss(sourcePosition);
+
+                var sourceAmplitude = soundSource.GetSample(sampleDelay);
+
+                amplitude += sourceAmplitude;// * energyLoss;
             }
-            return _loss;
+
+            return amplitude;
+        }
+
+        private int CalculateSampleDelay(Vector2 sourcePosition)
+        {
+            var samplePeriod = 1.0 / Globals.SampleRate;
+            var propagationSpeed = Globals.PropagationSpeed;
+            var distanceFromSource = Vector2.Distance(Position, sourcePosition);
+
+            var delayInSamples = distanceFromSource / (propagationSpeed * samplePeriod);
+
+            return (int)delayInSamples;
+        }
+        private double CalculateEnergyLoss(Vector2 sourcePosition)
+        {
+            var distanceFromSource = Vector2.Distance(Position, sourcePosition);
+            var propagationLoss = 1.0 / distanceFromSource;
+
+            var mediumPropagationLoss = 1.0;
+
+            return propagationLoss * mediumPropagationLoss;
         }
     }
 }
