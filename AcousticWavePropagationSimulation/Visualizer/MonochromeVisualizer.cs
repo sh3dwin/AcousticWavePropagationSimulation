@@ -78,6 +78,8 @@ namespace AcousticWavePropagationSimulation.Visualizer
 
         public static void Draw(IDictionary<Vector2, double> particleAmplitudes, ref DirectBitmap renderBuffer, int hueShift)
         {
+            particleAmplitudes = particleAmplitudes.NormalizeValues();
+
             if (particleAmplitudes.Count == 0)
                 throw new Exception("No information provided!");
             if (renderBuffer.Width * renderBuffer.Height < particleAmplitudes.Count)
@@ -85,24 +87,43 @@ namespace AcousticWavePropagationSimulation.Visualizer
                 throw new Exception("The information provided is larger than the canvas size");
             }
 
+            var result = new Int32[renderBuffer.Width * renderBuffer.Height];
+
             for (int row = 0; row < renderBuffer.Height; row++)
             {
                 for (int column = 0; column < renderBuffer.Width; column++)
                 {
-                    var amplitude = particleAmplitudes[new Vector2(column, row)];
+                    var index = row * renderBuffer.Width + column;
 
-                    var saturation = (int)(128 + 128 * amplitude);
+                    var color = System.Drawing.Color.Red.ToArgb();
 
-                    ColorUtils.HSVToRGB(hueShift, saturation, 1, out var r, out var g, out var b);
-
-                    var color = System.Drawing.Color.FromArgb(saturation, saturation, saturation);
-
-                    // Specify the area of the bitmap that changed.
-                    renderBuffer.SetPixel(column, row, color);
-
+                    renderBuffer.SetPixel(column, row, System.Drawing.Color.FromArgb((int)(255 * (hueShift / 360.0)), 0, 0));
                 }
             }
 
+            renderBuffer.Bits = result;
+        }
+
+        public static void Draw(double[] particleAmplitudes, ref DirectBitmap renderBuffer, int hueShift)
+        {
+            if (particleAmplitudes.Length < 1)
+                throw new Exception("No information provided!");
+            if (renderBuffer.Width * renderBuffer.Height < particleAmplitudes.Length)
+            {
+                throw new Exception("The information provided is larger than the canvas size");
+            }
+
+            particleAmplitudes = particleAmplitudes.NormalizeValues();
+
+            for (var i = 0; i < particleAmplitudes.Length; i++)
+            {
+                var x = i % renderBuffer.Width;
+                var y = i / renderBuffer.Width;
+
+                var color = System.Drawing.Color.FromArgb((int)(Math.Abs(particleAmplitudes[i] * 255)), 0, 0);
+
+                renderBuffer.SetPixel(x, y, color);
+            }
         }
     }
 }

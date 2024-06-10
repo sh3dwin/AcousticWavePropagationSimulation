@@ -15,6 +15,13 @@ using System.Windows.Threading;
 using System.Windows.Input;
 using AcousticWavePropagationSimulation.WPF.Commands;
 using System.Numerics;
+using System.Threading;
+using System.Security.Policy;
+using System.Windows.Media.Media3D;
+using System.Windows;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Collections;
 
 namespace AcousticWavePropagationSimulation.ViewModels
 {
@@ -28,13 +35,18 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
         private BitmapImage _image;
         private LoopbackAudioRecorder _recorder;
-        private CircularBuffer<double> _waveBuffer;
+
+        private DataStructures.CircularBuffer<float> _waveBuffer;
+
         DirectBitmap _waveImage;
         MediumParticleField _particleField;
 
-        private IEnumerable<SoundSource> _soundSources;
+        private byte[] waveData;
 
-        private DispatcherTimer _dispatcherTimer;
+        private List<SoundSource> _soundSources;
+
+        private ConcurrentQueue<bool> _eventQueue = new ConcurrentQueue<bool>();
+
         public VisualizationViewModel(double widthMeters, double heightMeters, int width, int height)
         {
             _widthMeters = widthMeters;
@@ -44,18 +56,21 @@ namespace AcousticWavePropagationSimulation.ViewModels
             _height = height;
             _recorder = new LoopbackAudioRecorder();
 
-            _waveBuffer = new CircularBuffer<double>(Constants.BufferSize);
+            _waveBuffer = new DataStructures.CircularBuffer<float>(Constants.BufferSize);
 
-            _soundSources = new List<SoundSource>()
-            {
-                new SoundSource(new Vector2(width / 2, height / 2)),
-                new SoundSource(new Vector2(width / 4, height / 4))
-            };
+            _soundSources = new List<SoundSource>();
+
+            var rand = new Random();
+            for (int i = 0; i < Constants.NumberOfSoundSources; i++) {
+                var x = rand.Next(0, _width);
+                var y = rand.Next(0, _height);
+
+                var pressure = rand.Next(100000, 1000000);
+
+                _soundSources.Add(new SoundSource(new Vector2(x, y), pressure));
+            }
 
             _waveImage = new DirectBitmap(width, height);
-
-            _dispatcherTimer = new DispatcherTimer();
-            _dispatcherTimer.Interval = TimeSpan.FromMilliseconds(100);
 
             _image = new BitmapImage();
 
@@ -72,9 +87,10 @@ namespace AcousticWavePropagationSimulation.ViewModels
                 throw new Exception("Error initializing particle fields");
             }
 
-            //_dispatcherTimer.Tick += UpdateVisualization;
-            _recorder.DataAvailableEvent += UpdateVisualization;
+            InitializeVisualizationLoop();
         }
+
+
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -108,60 +124,98 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
         private void RecalculateDelay()
         {
-            _particleField.GetMediumState(_soundSources);
+            _particleField.GetMediumState(_soundSources, sampleSkipCount);
         }
 
-        private void UpdateVisualization(object sender, EventArgs e)
+        private async void InitializeVisualizationLoop()
         {
-            UpdateBuffer(sender, e);
-            UpdateMediumState(sender, e);
-            UpdateImage(sender, e);
+            var cts = new CancellationTokenSource();
+            var eventTrigger = new TaskCompletionSource<bool>(false);
+
+            _recorder.DataAvailableEvent += (sender, e) =>
+            {
+                _eventQueue.Enqueue(true);
+            };
+
+            var visualizationTask = Task.Run(() => UpdateVisualization(cts.Token));
+
+            //UpdateBuffer();
+
+            await visualizationTask;
         }
 
-        private void UpdateBuffer(object sender, EventArgs e)
+        private async void UpdateVisualization(CancellationToken cancellationToken)
         {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var startTime = DateTime.Now;
+
+                if (_eventQueue.TryDequeue(out bool _))
+                {
+                    lock (_waveBuffer)
+                    {
+                        UpdateBuffer();
+                        sampleSkipCount = 0;
+                    }
+                }
+
+                UpdateMediumState();
+                UpdateImage();
+
+                //sampleSkipCount += 100;
+
+                var endTime = DateTime.Now - startTime;
+                if(1 / (endTime.Milliseconds / 1000.0) < 30)
+                    Debug.WriteLine($"FPS: {1.0 / (endTime.Milliseconds / 1000.0)}");
+            }
+        }
+
+        private int sampleSkipCount = 0;
+
+        private void UpdateBuffer()
+        {
+            if (!_recorder.ISBufferInitialized)
+                return;
+
+            sampleSkipCount = 0;
             var newData = _recorder.GetAudioData().ByteBuffer;
 
             float[] floatData = new float[newData.Length / sizeof(float)];
 
             Buffer.BlockCopy(newData, 0, floatData, 0, newData.Length);
 
-            for (var i = 0; i < floatData.Length; i++)
-            {
-                _waveBuffer.Add(floatData[i]);
-            }
+            floatData = floatData.TakeWhile(x => x != 0).ToArray();
+
+            for (var i = 0; i < floatData.Length * 4; i += 4)
+                floatData[i / 4] = BitConverter.ToSingle(newData, i);
+
+            _waveBuffer.Insert(floatData);//.Where((x, i) => i % 2 == 0).ToArray());
+
+            //_waveBuffer.Insert(floatData);
 
             foreach (var soundSource in _soundSources)
-                soundSource.UpdateBuffer(ref _waveBuffer);
+                soundSource.UpdateBuffer(_waveBuffer);
         }
 
-        private void UpdateImage(object sender, EventArgs e)
+        private void UpdateImage()
         {
-            var bitmap = AppendBitmapPartitions();
+            var bitmap = new Bitmap(_waveImage.Bitmap);
 
             Image = BitmapToImageSource(bitmap);
             Image.Freeze();
         }
 
-        private void UpdateMediumState(object sender, EventArgs e)
+
+        private void UpdateMediumState()
         {
-            var hueShift = Math.Abs((int)(Math.Sin(DateTime.Now.Millisecond / 10000.0) * 360));
+            var hueShift = DateTime.Now.Millisecond / 1000.0 * 360;
 
-            var particleAmplitudes = _particleField.GetMediumState(_soundSources);
+            //var amplitudes = _particleField.GetMediumStateAsArrayParallel(new List<SoundSource>(_soundSources), Constants.ParallelizationParameter, sampleSkipCount);
+            //var amplitudes = _particleField.GetMediumState(new List<SoundSource>(_soundSources), sampleSkipCount);
 
-            MonochromeVisualizer.Draw(particleAmplitudes, ref _waveImage, 0);
+            //MonochromeVisualizer.Draw(amplitudes, ref _waveImage, (int)hueShift);
+            DeciBellVisualizer.Draw(_soundSources, _waveImage);
 
-        }
-
-        private Bitmap AppendBitmapPartitions()
-        {
-            var result = new Bitmap(_width, _height);
-
-            using (Graphics g = Graphics.FromImage(result))
-            {
-                    g.DrawImage(_waveImage.Bitmap, 0, 0);
-            }
-            return result;
         }
 
         BitmapImage BitmapToImageSource(Bitmap bitmap)
@@ -199,23 +253,19 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
         private bool CanToggle()
         {
-            return _dispatcherTimer != null;
+            return true;
         }
 
         private void ToggleVisualization()
         {
-            if (_dispatcherTimer.IsEnabled)
-                _dispatcherTimer.Stop();
-            else
-                _dispatcherTimer.Start();
         }
 
         public void Dispose()
         {
+
             _recorder.Dispose();
 
             _waveImage.Dispose();
-
         }
     }
 }

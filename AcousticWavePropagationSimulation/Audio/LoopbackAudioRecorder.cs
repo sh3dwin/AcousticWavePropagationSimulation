@@ -24,7 +24,9 @@ namespace AcousticWavePropagationSimulation.Audio
 
         public void DataAvailable(object sender, WaveInEventArgs e)
         {
-            _buffer = new WaveBuffer(e.Buffer);
+            if(_buffer == null)
+                _buffer = new WaveBuffer(e.Buffer);
+
             OnDataAvailable(e);
         }
 
@@ -34,6 +36,8 @@ namespace AcousticWavePropagationSimulation.Audio
         {
             DataAvailableEvent?.Invoke(this, e);
         }
+
+        public bool ISBufferInitialized => _buffer != null;
 
         public WaveBuffer GetAudioData()
         {

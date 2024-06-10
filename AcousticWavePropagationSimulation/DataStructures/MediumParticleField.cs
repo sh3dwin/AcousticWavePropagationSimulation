@@ -20,7 +20,7 @@ namespace AcousticWavePropagationSimulation.DataStructures
         private double _width;
         private double _height;
 
-        private Dictionary<(int, int), MediumParticle> mediumParticles;
+        private Dictionary<(float, float), MediumParticle> _mediumParticles;
 
         public MediumParticleField(double width, double height, float numParticlesAlongXAxis, float numParticlesAlongYAxis)
         {
@@ -40,7 +40,7 @@ namespace AcousticWavePropagationSimulation.DataStructures
         /// <param name="offsetY"></param>
         public void CreateParticleField()
         {
-            mediumParticles = new Dictionary<(int, int), MediumParticle>();
+            _mediumParticles = new Dictionary<(float, float), MediumParticle>();
 
             var stepX = _width / _dimX;
             var stepY = _height / _dimY;
@@ -51,7 +51,7 @@ namespace AcousticWavePropagationSimulation.DataStructures
                 {
 
                     var particle = new MediumParticle(new Vector2((float)(i * stepX), (float)(j * stepY)));
-                    mediumParticles.Add((i, j), particle);
+                    _mediumParticles.Add((i, j), particle);
                 }
             }
 
@@ -66,16 +66,13 @@ namespace AcousticWavePropagationSimulation.DataStructures
         /// </summary>
         /// <param name="waveData"></param>
         /// <returns></returns>
-        public IDictionary<Vector2, double> GetMediumState(IEnumerable<SoundSource> soundSources)
+        public IDictionary<Vector2, double> GetMediumState(IEnumerable<SoundSource> soundSources, int sampleSkipCount)
         {
-            var particleAmplitudes = new Dictionary<Vector2, double>(mediumParticles.Values.Count);
+            var particleAmplitudes = new Dictionary<Vector2, double>(_mediumParticles.Values.Count);
 
-            foreach(var particle in mediumParticles.Values)
+            foreach (var particle in _mediumParticles.Values)
             {
-                var amplitude = particle.CalculateAmplitude(soundSources);
-
-                if (amplitude > 1 || amplitude < -1)
-                    throw new Exception("Incorrect amplitude");
+                var amplitude = particle.CalculateAmplitude(soundSources, sampleSkipCount);
 
                 particleAmplitudes[particle.Position] = amplitude;
             }
@@ -88,41 +85,88 @@ namespace AcousticWavePropagationSimulation.DataStructures
         /// </summary>
         /// <param name="waveData"></param>
         /// <returns></returns>
-        public IDictionary<Vector2, double> GetMediumStateParallel(IEnumerable<SoundSource> soundSources, int parallelism)
+        public IDictionary<Vector2, double> GetMediumStateParallel(IEnumerable<SoundSource> soundSources, int parallelism, int sampleSkipCount)
         {
-            var particleAmplitudes = new Dictionary<Vector2, double>(mediumParticles.Values.Count);
+            var numThreads = parallelism * parallelism;
 
-            var xStep = _width / parallelism;
-            var yStep = _height / parallelism;
+            var subSections = new Dictionary<Vector2, double>[numThreads];
 
-            var indexes = new List<(int, int)>();
+            var inverseParallelCount = 1.0 / parallelism;
 
-            for (int i = 0; i < parallelism; i++)
+            for (var i = 0; i < numThreads; i++)
             {
-                for(int j = 0; j < parallelism; j++)
-                {
-                    indexes.Add((i, j));
-                }
+                subSections[i] = new Dictionary<Vector2, double>((int)(_dimX * inverseParallelCount * _dimY * inverseParallelCount + 1));
             }
 
-            Parallel.ForEach(indexes, new ParallelOptions { MaxDegreeOfParallelism = parallelism * parallelism}, step =>
-            {
-                for( var column = step.Item1 * yStep; column < (step.Item1 + 1) * yStep;  column++)
-                {
-                    for (var row = step.Item1 * yStep; row < (step.Item2 + 1) * yStep; row++)
-                    {
-                        var particle = mediumParticles[((int)column, (int)row)];
-                        var amplitude = particle.CalculateAmplitude(soundSources);
 
-                        if (amplitude > 1 || amplitude < -1)
+            var parallelResult = Parallel.For(0, numThreads, new ParallelOptions { MaxDegreeOfParallelism = numThreads }, index =>
+            {
+                var startX = (int)((index / parallelism) * _dimX * inverseParallelCount);
+                var startY = (int)((index % parallelism) * _dimY * inverseParallelCount);
+
+                var endX = ((index / parallelism) + 1) * _dimX * inverseParallelCount;
+                var endY = ((index % parallelism) + 1) * _dimY * inverseParallelCount;
+
+                for (var i = startX; i < endX; i++)
+                {
+                    for (var j = startY; j < endY; j++)
+                    {
+                        var particle = _mediumParticles[(i, j)];
+                        var amplitude = particle.CalculateAmplitude(soundSources, sampleSkipCount);
+
+                        if (amplitude > soundSources.Count() || amplitude < -soundSources.Count())
                             throw new Exception("Incorrect amplitude");
 
-                        particleAmplitudes[particle.Position] = amplitude;
+                        subSections[index][particle.Position] = amplitude;
                     }
                 }
             });
 
-            return particleAmplitudes;
+
+            var result = new Dictionary<Vector2, double>(_mediumParticles.Count);
+            foreach (var dictionary in subSections)
+            {
+                foreach (var pair in dictionary)
+                    result[pair.Key] = pair.Value;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Returns width * height values each corresponding to the amplitude of the wave at that location.
+        /// </summary>
+        /// <param name="waveData"></param>
+        /// <returns></returns>
+        public double[] GetMediumStateAsArrayParallel(IEnumerable<SoundSource> soundSources, int parallelism, int sampleSkipCount)
+        {
+            var numThreads = parallelism * parallelism;
+            var inverseParallelCount = 1.0 / parallelism;
+
+            var result = new double[(int)(_width * _height)];
+
+            var parallelResult = Parallel.For(0, numThreads, new ParallelOptions { MaxDegreeOfParallelism = numThreads }, index =>
+            {
+                var startX = (int)((index / parallelism) * _width * inverseParallelCount);
+                var startY = (int)((index % parallelism) * _height * inverseParallelCount);
+
+                var endX = ((index / parallelism) + 1) * _width * inverseParallelCount;
+                var endY = ((index % parallelism) + 1) * _height * inverseParallelCount;
+
+                for (var j = startY; j < endY; j++)
+                {
+                    for (var i = startX; i < endX; i++)
+                    {
+                        var particle = _mediumParticles[(i, j)];
+                        var amplitude = particle.CalculateAmplitude(soundSources, sampleSkipCount);
+
+                        var ind = (int)(particle.Position.Y * _width + particle.Position.X);
+                        result[ind] = amplitude;
+                    }
+                }
+            });
+
+            return result;
         }
     }
 }
