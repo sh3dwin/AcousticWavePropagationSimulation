@@ -22,16 +22,25 @@ namespace AcousticWavePropagationSimulation.DataStructures
                 var sourcePosition = soundSource.Position;
                 
                 var sampleDelay = CalculateSampleDelay(sourcePosition) - sampleSkipCount;
-                var energyLoss = CalculateEnergyLoss(sourcePosition);
+                var propagationLoss = CalculatePropagationLoss(sourcePosition);
+                var attenuationLoss = CalculateAttenuation(sourcePosition);
 
                 var sourceAmplitude = soundSource.GetSample(sampleDelay);
 
-                var pressureLevel = Globals.PressureLevelToDBs(soundSource.PressureLevel);
+                var pressureLevel = Globals.PressureLevelToDeciBells(soundSource.PressureLevel);
 
-                amplitude += sourceAmplitude * energyLoss * pressureLevel;
+                amplitude += sourceAmplitude * propagationLoss * attenuationLoss * pressureLevel;
             }
 
             return amplitude;
+        }
+
+        private double CalculateAttenuation(Vector2 sourcePosition)
+        {
+            var attenuationRate = Globals.CalculateAttenuationRateStokesLaw();
+            var distanceTraveled = Vector2.Distance(sourcePosition, Position);
+
+            return Math.Exp(-attenuationRate * distanceTraveled);
         }
 
         private int CalculateSampleDelay(Vector2 sourcePosition)
@@ -44,7 +53,7 @@ namespace AcousticWavePropagationSimulation.DataStructures
 
             return (int)delayInSamples;
         }
-        private double CalculateEnergyLoss(Vector2 sourcePosition)
+        private double CalculatePropagationLoss(Vector2 sourcePosition)
         {
             var distanceFromSource = Math.Max(Vector2.Distance(Position, sourcePosition), 1);
             var propagationLoss = 1.0 / distanceFromSource;

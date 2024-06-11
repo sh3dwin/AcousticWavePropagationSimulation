@@ -1,10 +1,7 @@
-﻿using Microsoft.VisualStudio.Utilities;
-using System;
-using System.Collections.Concurrent;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AcousticWavePropagationSimulation.DataStructures
@@ -60,6 +57,7 @@ namespace AcousticWavePropagationSimulation.DataStructures
 
         public bool IsInitialized { get; private set; }
 
+        public IEnumerable<(double X, double Y)> ParticlePositions => _mediumParticles.Values.Select(p => ((double)p.Position.X, (double)p.Position.Y));
 
         /// <summary>
         /// Returns width * height values each corresponding to the amplitude of the wave at that location.

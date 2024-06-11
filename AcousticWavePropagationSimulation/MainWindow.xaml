@@ -5,10 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:AcousticWavePropagationSimulation"
         mc:Ignorable="d"
-        Title="MainWindow" Height="500" Width="500">
+        Title="MainWindow" Height="1000" Width="1000">
     <Grid>
         <Image x:Name="Visualizer" Source="{Binding Image}"/>
-        <Slider x:Name="PropagationSpeed" Value="{Binding PropagationSpeed}"
+        <Slider Visibility="Hidden" x:Name="PropagationSpeed" Value="{Binding PropagationSpeed}"
                 Minimum="10"
                 Maximum="5000"
                 HorizontalAlignment="Center"
@@ -16,8 +16,18 @@
                 VerticalAlignment="Bottom"
                 MinWidth="500"
                 />
-        
-        <Button Margin="0, 50, 0, 0" VerticalAlignment="Top" Width="200" Height="50" Command="{Binding ToggleVisualizationCommand}">Toggle Visualization</Button>
+        <Label FontSize="40" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="50, 0, 50, 50" Content="{Binding Loudness}"/>
+        <Slider x:Name="Loudness" Value="{Binding Loudness}"
+        Minimum="60"
+        Maximum="120"
+        HorizontalAlignment="Center"
+        Margin="50, 0, 50, 50"
+        VerticalAlignment="Bottom"
+        MinWidth="500" SmallChange="1" TabIndex="1" SelectionStart="71" IsMoveToPointEnabled="True"
+        />
+
+
+        <Button Visibility="Hidden" Margin="0, 50, 0, 0" VerticalAlignment="Top" Width="200" Height="50" Command="{Binding ToggleVisualizationCommand}">Toggle Visualization</Button>
 
 
     </Grid>

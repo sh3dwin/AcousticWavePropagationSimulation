@@ -1,6 +1,5 @@
 ﻿using NAudio.Wave;
 using System;
-using System.Security.Principal;
 
 namespace AcousticWavePropagationSimulation.Audio
 {

@@ -1,17 +1,8 @@
 ﻿using AcousticWavePropagationSimulation.DataStructures;
 using AcousticWavePropagationSimulation.Utils;
-using NAudio.Utils;
-using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Drawing;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Media.Animation;
-using System.Windows.Media.Imaging;
 
 namespace AcousticWavePropagationSimulation.Visualizer
 {
@@ -32,24 +23,21 @@ namespace AcousticWavePropagationSimulation.Visualizer
                     foreach(var soundSource in soundSources)
                     {
                         var distanceToSoundSource = Vector2.Distance(soundSource.Position, currentPosition).Clamp(1, float.MaxValue);
-                        var loss = 1.0 / distanceToSoundSource;
-                        var soundSourcePressureLevelAtPosition = soundSource.PressureLevel * loss;
+                        var propagationLoss = 1.0 / distanceToSoundSource;
+                        var attenuationLoss = Globals.CalculateAttenuationLoss(distanceToSoundSource);
+                        var soundSourcePressureLevelAtPosition = soundSource.PressureLevel * propagationLoss * attenuationLoss;
 
                         pressure += soundSourcePressureLevelAtPosition;
                     }
-                    var dBFromSoundSource = Globals.PressureLevelToDBs(pressure);
+                    var dBFromSoundSource = Globals.PressureLevelToDeciBells(pressure);
 
                     maxPressureField[col, row] = dBFromSoundSource;
                 }
             }
 
-            var normalizedValues = maxPressureField.NormalizeValues();
+            //maxPressureField[0, 0] = Constants.MaximumDBs;
 
-            var asd = new double[10, 20];
-
-            var len = asd.GetLength(0);
-
-
+            var normalizedValues = maxPressureField.NormalizeValuesMinMax();
 
             for (var row = 0; row < renderBuffer.Height; row++)
             {

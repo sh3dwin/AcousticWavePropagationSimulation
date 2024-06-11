@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.VisualStudio.Utilities;
 using AcousticWavePropagationSimulation.Audio;
 using AcousticWavePropagationSimulation.DataStructures;
 using AcousticWavePropagationSimulation.Visualizer;
@@ -11,17 +10,13 @@ using System.Threading.Tasks;
 using System.Drawing;
 using System.IO;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using System.Windows.Input;
 using AcousticWavePropagationSimulation.WPF.Commands;
 using System.Numerics;
 using System.Threading;
-using System.Security.Policy;
-using System.Windows.Media.Media3D;
-using System.Windows;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Collections;
+using PoissonDiskSampling;
 
 namespace AcousticWavePropagationSimulation.ViewModels
 {
@@ -33,19 +28,19 @@ namespace AcousticWavePropagationSimulation.ViewModels
         private double _widthMeters;
         private double _heightMeters;
 
-        private BitmapImage _image;
-        private LoopbackAudioRecorder _recorder;
+        private BitmapImage _image = new BitmapImage();
+        private LoopbackAudioRecorder _recorder = new LoopbackAudioRecorder();
 
-        private DataStructures.CircularBuffer<float> _waveBuffer;
+        private CircularBuffer<float> _waveBuffer = new CircularBuffer<float>(Constants.BufferSize);
 
         DirectBitmap _waveImage;
         MediumParticleField _particleField;
 
-        private byte[] waveData;
-
-        private List<SoundSource> _soundSources;
+        private List<SoundSource> _soundSources = new List<SoundSource>();
 
         private ConcurrentQueue<bool> _eventQueue = new ConcurrentQueue<bool>();
+
+        private bool _visualizeAcousticWaves = true;
 
         public VisualizationViewModel(double widthMeters, double heightMeters, int width, int height)
         {
@@ -54,14 +49,38 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
             _width = width;
             _height = height;
-            _recorder = new LoopbackAudioRecorder();
+            _waveImage = new DirectBitmap(width, height);
 
-            _waveBuffer = new DataStructures.CircularBuffer<float>(Constants.BufferSize);
+            InstantiateParticleField();
+            InitializeVisualizationLoop();
+            InstantiateSoundsSources();
+        }
 
-            _soundSources = new List<SoundSource>();
+        private void InstantiateParticleField()
+        {
+            var particleField = new MediumParticleField(_widthMeters, _heightMeters, _width, _height);
+            particleField.CreateParticleField();
 
+            if (particleField.IsInitialized)
+                _particleField = particleField;
+
+            if (!_particleField.IsInitialized)
+                throw new Exception("Error initializing particle fields");
+        }
+
+        private void InstantiateSoundsSources()
+        {
+            if (false)
+                InstantiateSoundSourcesRandom();
+            else
+                InstantiateSoundSourcesPoissonDisks();
+        }
+
+        private void InstantiateSoundSourcesRandom()
+        {
             var rand = new Random();
-            for (int i = 0; i < Constants.NumberOfSoundSources; i++) {
+            for (int i = 0; i < Constants.NumberOfSoundSources; i++)
+            {
                 var x = rand.Next(0, _width);
                 var y = rand.Next(0, _height);
 
@@ -69,28 +88,23 @@ namespace AcousticWavePropagationSimulation.ViewModels
 
                 _soundSources.Add(new SoundSource(new Vector2(x, y), pressure));
             }
-
-            _waveImage = new DirectBitmap(width, height);
-
-            _image = new BitmapImage();
-
-            var particleField = new MediumParticleField(_widthMeters, _heightMeters, width, height);
-            particleField.CreateParticleField();
-
-            if (particleField.IsInitialized)
-            {
-                _particleField = particleField;
-            }
-
-            if (!_particleField.IsInitialized)
-            {
-                throw new Exception("Error initializing particle fields");
-            }
-
-            InitializeVisualizationLoop();
         }
 
+        private void InstantiateSoundSourcesPoissonDisks()
+        {
+            var maximumPressure = Globals.DeciBellsToPressureLevel(Globals.MaximumDBs);
+            var minimumPressure = Globals.DeciBellsToPressureLevel(Constants.MinimumDBs);
 
+            var radius = maximumPressure / minimumPressure;
+
+            var points = _particleField.ParticlePositions.ToList();
+            //points.Insert(0, points.ElementAt((_width * _height / 2) + (_width / 2)));
+
+            var soundSourceLocations = PoissonDiskSampling.PoissonDiskSampling.Apply(points, radius);
+
+            _soundSources.Clear();
+            _soundSources.AddRange(soundSourceLocations.Select(loc => new SoundSource(new Vector2((float)loc.Position.X, (float)loc.Position.Y), maximumPressure)));
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -112,6 +126,17 @@ namespace AcousticWavePropagationSimulation.ViewModels
                 Globals.PropagationSpeed = value;
                 RecalculateDelay();
                 RaisePropertyChanged(nameof(PropagationSpeed));
+            }
+        }
+
+        public int Loudness
+        {
+            get => (int)Globals.MaximumDBs;
+            set
+            {
+                Globals.MaximumDBs = value;
+                this._updated = true;
+                RaisePropertyChanged(nameof(Loudness));
             }
         }
 
@@ -137,11 +162,11 @@ namespace AcousticWavePropagationSimulation.ViewModels
                 _eventQueue.Enqueue(true);
             };
 
-            var visualizationTask = Task.Run(() => UpdateVisualization(cts.Token));
+            _visualizationTask = Task.Run(() => UpdateVisualization(cts.Token));
 
             //UpdateBuffer();
 
-            await visualizationTask;
+            await _visualizationTask;
         }
 
         private async void UpdateVisualization(CancellationToken cancellationToken)
@@ -150,8 +175,13 @@ namespace AcousticWavePropagationSimulation.ViewModels
             {
                 var startTime = DateTime.Now;
 
-                if (_eventQueue.TryDequeue(out bool _))
+                if (_eventQueue.TryDequeue(out bool _) || _updated)
                 {
+                    if (_updated)
+                    {
+                        _updated = false;
+                        InstantiateSoundSourcesPoissonDisks();
+                    }
                     lock (_waveBuffer)
                     {
                         UpdateBuffer();
@@ -235,6 +265,8 @@ namespace AcousticWavePropagationSimulation.ViewModels
         }
 
         private ICommand _toggleVisualization;
+        private bool _updated;
+        private Task _visualizationTask;
 
         public ICommand ToggleVisualizationCommand
         {
@@ -256,12 +288,16 @@ namespace AcousticWavePropagationSimulation.ViewModels
             return true;
         }
 
+        
+
         private void ToggleVisualization()
         {
+            _visualizeAcousticWaves = !_visualizeAcousticWaves;
         }
 
         public void Dispose()
         {
+            _visualizationTask.Dispose();
 
             _recorder.Dispose();
 

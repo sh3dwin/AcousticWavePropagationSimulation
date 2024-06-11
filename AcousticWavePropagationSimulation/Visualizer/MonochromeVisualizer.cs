@@ -2,16 +2,8 @@
 using AcousticWavePropagationSimulation.Utils;
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
-using System.Drawing;
-using System.Linq;
 using System.Numerics;
-using System.Security.Policy;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace AcousticWavePropagationSimulation.Visualizer

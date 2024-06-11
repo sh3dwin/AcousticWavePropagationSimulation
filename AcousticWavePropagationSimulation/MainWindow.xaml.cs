@@ -1,5 +1,4 @@
 ﻿using AcousticWavePropagationSimulation.ViewModels;
-using System;
 using System.Windows;
 
 namespace AcousticWavePropagationSimulation

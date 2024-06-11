@@ -272,6 +272,16 @@
     <Analyzer Include="..\packages\Microsoft.VisualStudio.Threading.Analyzers.17.9.28\analyzers\vb\Microsoft.VisualStudio.Threading.Analyzers.dll" />
     <Analyzer Include="..\packages\Microsoft.VisualStudio.Threading.Analyzers.17.9.28\analyzers\vb\Microsoft.VisualStudio.Threading.Analyzers.VisualBasic.dll" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DataStructures\DataStructures.csproj">
+      <Project>{92B1134E-11D8-4007-99A0-B69DDBCFC621}</Project>
+      <Name>DataStructures</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\PoissonDiskSampling\PoissonDiskSampling.csproj">
+      <Project>{97bafe2c-f8dd-476e-a484-58c510b2ef69}</Project>
+      <Name>PoissonDiskSampling</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Microsoft.VisualStudio.Threading.Analyzers.17.9.28\build\Microsoft.VisualStudio.Threading.Analyzers.targets" Condition="Exists('..\packages\Microsoft.VisualStudio.Threading.Analyzers.17.9.28\build\Microsoft.VisualStudio.Threading.Analyzers.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

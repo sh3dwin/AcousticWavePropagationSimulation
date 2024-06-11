@@ -1,11 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Security.Policy;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AcousticWavePropagationSimulation.Utils
 {
@@ -76,6 +71,38 @@ namespace AcousticWavePropagationSimulation.Utils
             {
                 for(var j = 0; j < result.GetLength(1); j++)
                     result[i, j] = array[i, j] / max;
+            }
+
+            return result;
+        }
+
+        public static double[,] NormalizeValuesMinMax(this double[,] array)
+        {
+            var max = double.MinValue;
+            var min = double.MaxValue;
+
+            foreach (var value in array)
+            {
+                if (Math.Abs(value) > max)
+                    max = Math.Abs(value);
+                if (Math.Abs(value) < min)
+                    min = Math.Abs(value);
+            }
+
+            if (max == 0.0)
+                max = 1.0;
+
+            if (min > max)
+                throw new Exception("Error normalizing");
+
+            var inverseDifference = 1.0 / (max - min);
+
+            var result = new double[array.GetLength(0), array.GetLength(1)];
+
+            for (var i = 0; i < result.GetLength(0); i++)
+            {
+                for (var j = 0; j < result.GetLength(1); j++)
+                    result[i, j] = (array[i, j] - min) * inverseDifference;
             }
 
             return result;
