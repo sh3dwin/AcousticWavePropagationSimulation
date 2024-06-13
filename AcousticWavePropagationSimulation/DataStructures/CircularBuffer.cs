@@ -23,7 +23,6 @@ namespace AcousticWavePropagationSimulation.DataStructures
             var overflow = Math.Max(0, Count + sizeOfArray - Size);
 
             ShiftLeftAndPadWithZeroes(overflow);
-            Count -= overflow;
             InsertAtEnd(array);
         }
         private void InsertAtEnd(T[] smallArray)
@@ -46,7 +45,7 @@ namespace AcousticWavePropagationSimulation.DataStructures
             {
                 _buffer[i - shiftAmount] = _buffer[i];
             }
-
+            Count -= shiftAmount;
         }
     }
 }

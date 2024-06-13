@@ -18,7 +18,7 @@ namespace AcousticWavePropagationSimulation
 
         private void InitializeViewModel()
         {
-            _viewModel = new VisualizationViewModel(Width, Height, (int)Width, (int)Height);
+            _viewModel = new VisualizationViewModel(1000, 1000, 1000, 1000);
 
             DataContext = _viewModel;
         }

@@ -277,6 +277,10 @@
       <Project>{92B1134E-11D8-4007-99A0-B69DDBCFC621}</Project>
       <Name>DataStructures</Name>
     </ProjectReference>
+    <ProjectReference Include="..\NewtonRaphsonSolver\NewtonRaphsonSolver.csproj">
+      <Project>{61464857-cfff-41c6-8601-1e873338b909}</Project>
+      <Name>NewtonRaphsonSolver</Name>
+    </ProjectReference>
     <ProjectReference Include="..\PoissonDiskSampling\PoissonDiskSampling.csproj">
       <Project>{97bafe2c-f8dd-476e-a484-58c510b2ef69}</Project>
       <Name>PoissonDiskSampling</Name>

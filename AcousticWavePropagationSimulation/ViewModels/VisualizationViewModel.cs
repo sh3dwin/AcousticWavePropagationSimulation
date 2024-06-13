@@ -17,6 +17,7 @@ using System.Threading;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using PoissonDiskSampling;
+using NewtonRaphsonSolver;
 
 namespace AcousticWavePropagationSimulation.ViewModels
 {
@@ -95,10 +96,10 @@ namespace AcousticWavePropagationSimulation.ViewModels
             var maximumPressure = Globals.DeciBellsToPressureLevel(Globals.MaximumDBs);
             var minimumPressure = Globals.DeciBellsToPressureLevel(Constants.MinimumDBs);
 
-            var radius = maximumPressure / minimumPressure;
-
+            var initial = maximumPressure / minimumPressure;
+            var radius = NewtonRaphsonSolver.NewtonRaphsonSolver.NewtonRaphson(initial, maximumPressure, minimumPressure, Globals.CalculateAttenuationRateStokesLaw());
             var points = _particleField.ParticlePositions.ToList();
-            //points.Insert(0, points.ElementAt((_width * _height / 2) + (_width / 2)));
+            points.Insert(0, points.ElementAt((_width * _height / 2) + (_width / 2)));
 
             var soundSourceLocations = PoissonDiskSampling.PoissonDiskSampling.Apply(points, radius);
 

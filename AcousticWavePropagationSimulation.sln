@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoissonDiskSampling", "Pois
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataStructures", "DataStructures\DataStructures.csproj", "{92B1134E-11D8-4007-99A0-B69DDBCFC621}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewtonRaphsonSolver", "NewtonRaphsonSolver\NewtonRaphsonSolver.csproj", "{61464857-CFFF-41C6-8601-1E873338B909}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{92B1134E-11D8-4007-99A0-B69DDBCFC621}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{92B1134E-11D8-4007-99A0-B69DDBCFC621}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{92B1134E-11D8-4007-99A0-B69DDBCFC621}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61464857-CFFF-41C6-8601-1E873338B909}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61464857-CFFF-41C6-8601-1E873338B909}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61464857-CFFF-41C6-8601-1E873338B909}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61464857-CFFF-41C6-8601-1E873338B909}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
